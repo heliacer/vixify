@@ -39,13 +39,13 @@ function balance(target: User | GuildMember, author: User, guildId: string) {
 export class Eds {
   @Slash({
     name: 'eds',
-    description: 'How the world sees your worth',
+    description: 'Count your Eddies before we do',
     contexts: [InteractionContextType.Guild]
   })
   async slash(
     @SlashOption({
       name: 'user',
-      description: 'user',
+      description: 'Whose net worth to audit',
       required: false,
       type: ApplicationCommandOptionType.User
     })
