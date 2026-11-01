@@ -1,11 +1,8 @@
-# files
-.vscode
 .env
-.env.local
-package-lock.json
-yarn.lock
+node_modules/
+build/
 
-# folders
-build
-node_modules
-/generated/prisma
+# sqlite database (migrations in drizzle/ are committed)
+*.db
+*.db-wal
+*.db-shm

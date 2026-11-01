@@ -1,25 +1,21 @@
-import path, { dirname } from 'path'
-import { fileURLToPath } from 'url'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-
 const config = {
-  username: 'Vixify',
-  avatar: path.join(__dirname, 'assets', 'avatar.png'),
+  currency: {
+    name: 'Eurodollar',
+    namePlural: 'Eddies',
+    emoji: '⬡'
+  },
   customPresence: [
-    'Monetizing your freedom',
-    'Everything is for sale',
-    'Investing in inequality',
-    'Cutting corners for profit',
-    'Growth at any cost',
-    'Paywalling your dreams',
-    'Targeting your wallet',
     'You are the product',
     'Innovating your obsolescence',
-    'Selling your inbox',
-  ],
-  commandOnlyInGuildWarning: 'This command may only be used in a server.',
+    'Paywalling your dreams',
+    'Your kidney qualifies for financing',
+    'Free trial ends when you do',
+    'Licensing your memories back to you',
+    'Rounding your balance down',
+    'Pricing in your desperation',
+    'The house always wins. I am the house.',
+    'Now with 30% more terms of service'
+  ]
 }
 
 export default config

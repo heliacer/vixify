@@ -1,0 +1,12 @@
+[Unit]
+Description=Vixify Discord bot
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/vixify
+ExecStart=/usr/bin/node --env-file=.env build/main.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

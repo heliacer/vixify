@@ -1,99 +1,75 @@
-<div>
-  <p align="center">
-    <a href="https://discordx.js.org" target="_blank" rel="nofollow">
-      <img src="https://discordx.js.org/discordx.svg" width="546" />
-    </a>
-  </p>
-  <p align="center">
-    <a href="https://discordx.js.org/discord"
-      ><img
-        src="https://img.shields.io/discord/874802018361950248?color=5865F2&logo=discord&logoColor=white"
-        alt="Discord server"
-    /></a>
-    <a href="https://www.npmjs.com/package/discordx"
-      ><img
-        src="https://img.shields.io/npm/v/discordx.svg?maxAge=3600"
-        alt="NPM version"
-    /></a>
-    <a href="https://www.npmjs.com/package/discordx"
-      ><img
-        src="https://img.shields.io/npm/dt/discordx.svg?maxAge=3600"
-        alt="NPM downloads"
-    /></a>
-    <a href="https://github.com/discordx-ts/discordx/actions"
-      ><img
-        src="https://github.com/discordx-ts/discordx/workflows/Build/badge.svg"
-        alt="Build status"
-    /></a>
-    <a href="https://www.paypal.me/vijayxmeena"
-      ><img
-        src="https://img.shields.io/badge/donate-paypal-F96854.svg"
-        alt="paypal"
-    /></a>
-  </p>
-  <p align="center">
-    <b> Create a discord bot with TypeScript and Decorators! </b>
-  </p>
-</div>
+# Vixify
 
-# 📖 Introduction
+✧ casino, theft, lootboxes. Welcome to late stage discord, choomba.
 
-A starter template equipped with several interaction commands and one event.
+Economy bot built with [discordx](https://discordx.js.org), [drizzle](https://orm.drizzle.team) and SQLite.
 
-# 🏗 Development
+## Development
+
+Requires Node 24+. Create `.env`:
 
 ```
+BOT_TOKEN=...
+```
+
+```bash
 npm install
 npm run dev
 ```
 
-If you want to use [Nodemon](https://nodemon.io/) to auto-reload while in development:
+-> single file database, `vixify.db`, created on first start.
 
-```
-npm run watch
-```
+### Changing the schema
 
-# 💻 Production
+1. Edit `src/db/schema.ts`
+2. `npm run db:generate` writes a new SQL migration to `drizzle/`
+3. Commit changes, the bot applies pending migrations on startup.
 
-```
-npm install --production
-npm run build
-npm run start
-```
+`npm run db:studio` opens a browser UI for the database.
 
-# 🐋 Docker
+## Raspberry Pi
 
-To start your application:
+### 1. Install
 
-```
-docker-compose up -d
-```
+```bash
+curl -fsSL https://deb.nodesource.com/setup_26.x | sudo bash -
+sudo apt install -y nodejs git sqlite3
 
-To shut down your application:
-
-```
-docker-compose down
+git clone https://github.com/heliacer/vixify.git ~/vixify
+cd ~/vixify
+nano .env   # BOT_TOKEN=...
+npm ci && npm run build
 ```
 
-To view your application's logs:
+### 2. Run as a service
+
+```bash
+mkdir -p ~/.config/systemd/user
+ln -s ~/vixify/vixify.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now vixify
+sudo loginctl enable-linger $USER
+```
+
+logs: `journalctl --user -u vixify -f`
+
+### 3. Auto-update and backups
+
+`crontab -e`:
 
 ```
-docker-compose logs
+*/5 * * * * bash ~/vixify/deploy.sh >> ~/vixify/deploy.log 2>&1
+0 4 * * * mkdir -p ~/backups && sqlite3 ~/vixify/vixify.db ".backup $HOME/backups/vixify-$(date +\%a).db"
 ```
 
-For the full command list please view the [Docker Documentation](https://docs.docker.com/engine/reference/commandline/cli/).
+### 4. Deploy from your PC
 
-# 📜 Documentation
+`~/.ssh/config` on your PC:
 
-- [discordx.js.org](https://discordx.js.org)
-- [Tutorials (dev.to)](https://dev.to/samarmeena/series/14317)
+```
+Host pi
+  HostName pi.local
+  User <user>
+```
 
-# ☎️ Need help?
-
-- [Check frequently asked questions](https://discordx.js.org/docs/faq)
-- [Check examples](https://github.com/discordx-ts/discordx/tree/main/packages/discordx/examples)
-- Ask in the community [Discord server](https://discordx.js.org/discord)
-
-# 💖 Thank you
-
-You can support [discordx](https://www.npmjs.com/package/discordx) by giving it a [GitHub](https://github.com/discordx-ts/discordx) star.
+`npm run deploy` after pushing.

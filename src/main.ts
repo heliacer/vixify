@@ -1,100 +1,42 @@
-import { dirname, importx } from '@discordx/importer'
-import type { Interaction, Message } from 'discord.js'
 import { ActivityType, IntentsBitField } from 'discord.js'
 import { Client } from 'discordx'
-import dotenv from 'dotenv'
-import prisma from './data/prisma.js'
 import config from './config.js'
+import './commands/eds.js'
+import './commands/rank.js'
+import './events/activity.js'
 
-dotenv.config()
-
-export const bot = new Client({
-  // To use only guild command
-  // botGuilds: [(client) => client.guilds.cache.map((guild) => guild.id)],
-
-  // Discord intents
+const bot = new Client({
   intents: [
     IntentsBitField.Flags.Guilds,
-    IntentsBitField.Flags.GuildMembers,
     IntentsBitField.Flags.GuildMessages,
-    IntentsBitField.Flags.GuildMessageReactions,
-    IntentsBitField.Flags.GuildVoiceStates,
-    IntentsBitField.Flags.MessageContent,
+    IntentsBitField.Flags.MessageContent
   ],
-
-  // Debug logs are disabled in silent mode
-  silent: false,
-
-  // Configuration for @SimpleCommand
-  simpleCommand: {
-    prefix: '?',
-  },
+  simpleCommand: { prefix: '?' }
 })
 
-bot.once('clientReady', () => {
-  // Make sure all guilds are cached
-  // await bot.guilds.fetch();
+bot.once('clientReady', async () => {
+  // Synchronize application commands with Discord
+  await bot.initApplicationCommands()
 
-  // Synchronize applications commands with Discord
-  void bot.initApplicationCommands()
-
-  bot.user?.setAvatar(config.avatar)
-  bot.user?.setUsername(config.username)
+  const presence = config.customPresence
   bot.user?.setPresence({
     activities: [
       {
-        name: config.customPresence[
-          Math.floor(Math.random() * config.customPresence.length)
-        ],
-        type: ActivityType.Custom,
-      },
-    ],
+        name: presence[Math.floor(Math.random() * presence.length)],
+        type: ActivityType.Custom
+      }
+    ]
   })
-
-  // To clear all guild commands, uncomment this line,
-  // This is useful when moving from guild commands to global commands
-  // It must only be executed once
-  //
-  //  await bot.clearApplicationCommands(
-  //    ...bot.guilds.cache.map((g) => g.id)
-  //  );
 
   console.log('Bot started')
 })
 
-bot.on('interactionCreate', (interaction: Interaction) => {
-  bot.executeInteraction(interaction)
+bot.on('interactionCreate', interaction => {
+  void bot.executeInteraction(interaction)
 })
 
-bot.on('messageCreate', (message: Message) => {
+bot.on('messageCreate', message => {
   void bot.executeCommand(message)
 })
 
-async function run() {
-  // The following syntax should be used in the commonjs environment
-  //
-  // await importx(__dirname + "/{events,commands}/**/*.{ts,js}");
-
-  // The following syntax should be used in the ECMAScript environment
-  await importx(`${dirname(import.meta.url)}/{events,commands}/**/*.{ts,js}`)
-
-  // Let's start the bot
-  if (!process.env.BOT_TOKEN) {
-    throw Error('Could not find BOT_TOKEN in your environment')
-  }
-
-  // Log in with your bot token
-  await bot.login(process.env.BOT_TOKEN)
-}
-
-void run()
-
-process.on('SIGINT', async () => {
-  await prisma.$disconnect()
-  process.exit(0)
-})
-
-process.on('SIGTERM', async () => {
-  await prisma.$disconnect()
-  process.exit(0)
-})
+await bot.login(process.env.BOT_TOKEN!)
