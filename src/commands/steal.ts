@@ -39,8 +39,9 @@ const caughtAt = new Map<string, number>()
 // Shared by ?steal and /steal, only an actual steal pings the target
 function steal(thief: User, target: User | GuildMember, guildId: string) {
   const key = `${guildId}:${thief.id}`
-  // 10% of the target's coins, and the thief stakes the same amount
-  const amount = Math.floor(balance(target.id, guildId) * 0.1)
+  // 10% of the target's coins but at least 1, and the thief stakes the same amount
+  const held = balance(target.id, guildId)
+  const amount = held && Math.max(1, Math.floor(held * 0.1))
   const coins = `\`${amount.toLocaleString('de-CH')} ${config.currency.emoji}\``
   const users: string[] = []
   let content: string
