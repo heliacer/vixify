@@ -7,7 +7,7 @@ const config = {
   },
   rank: {
     label: 'Level',
-    short: 'LV'
+    short: 'LVL'
   },
   customPresence: [
     'You are the product',
