@@ -3,6 +3,7 @@ import { ActivityType, IntentsBitField } from 'discord.js'
 import { Client } from 'discordx'
 import config from './config.js'
 import './commands/coins.js'
+import './commands/steal.js'
 import './events/activity.js'
 
 // Random status line, never the same one twice in a row
@@ -30,10 +31,7 @@ bot.once('clientReady', async () => {
   // Synchronize application commands with Discord
   await bot.initApplicationCommands()
 
-  setInterval(
-    () => bot.user?.setPresence(nextPresence()),
-    20000
-  )
+  setInterval(() => bot.user?.setPresence(nextPresence()), 20000)
 
   console.log('Bot started')
 })
