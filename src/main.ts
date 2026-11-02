@@ -1,10 +1,23 @@
+import type { PresenceData } from 'discord.js'
 import { ActivityType, IntentsBitField } from 'discord.js'
 import { Client } from 'discordx'
 import config from './config.js'
 import './commands/coins.js'
 import './events/activity.js'
 
+// Random status line, never the same one twice in a row
+let lastPresence = -1
+function nextPresence(): PresenceData {
+  const lines = config.customPresence
+  let i = Math.floor(Math.random() * lines.length)
+  if (lines.length > 1 && i === lastPresence) i = (i + 1) % lines.length
+  lastPresence = i
+  return { activities: [{ name: lines[i], type: ActivityType.Custom }] }
+}
+
 const bot = new Client({
+  // Also sent on every fresh gateway identify, so a reconnect never drops the status
+  presence: nextPresence(),
   intents: [
     IntentsBitField.Flags.Guilds,
     IntentsBitField.Flags.GuildMessages,
@@ -17,15 +30,10 @@ bot.once('clientReady', async () => {
   // Synchronize application commands with Discord
   await bot.initApplicationCommands()
 
-  const presence = config.customPresence
-  bot.user?.setPresence({
-    activities: [
-      {
-        name: presence[Math.floor(Math.random() * presence.length)],
-        type: ActivityType.Custom
-      }
-    ]
-  })
+  setInterval(
+    () => bot.user?.setPresence(nextPresence()),
+    config.presenceInterval
+  )
 
   console.log('Bot started')
 })
