@@ -33,7 +33,7 @@ npm run dev
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_26.x | sudo bash -
-sudo apt install -y nodejs git sqlite3
+sudo apt install -y nodejs git sqlite3 fonts-roboto
 
 git clone https://github.com/heliacer/vixify.git ~/vixify
 cd ~/vixify

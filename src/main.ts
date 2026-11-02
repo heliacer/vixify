@@ -1,8 +1,7 @@
 import { ActivityType, IntentsBitField } from 'discord.js'
 import { Client } from 'discordx'
 import config from './config.js'
-import './commands/eds.js'
-import './commands/rank.js'
+import './commands/coins.js'
 import './events/activity.js'
 
 const bot = new Client({

@@ -1,7 +1,8 @@
 const config = {
+  color: 0xd55efa,
   currency: {
-    name: 'Eurodollar',
-    namePlural: 'Eddies',
+    name: 'Coin',
+    namePlural: 'Coins',
     emoji: '⬡'
   },
   customPresence: [

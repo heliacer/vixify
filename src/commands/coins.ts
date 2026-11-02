@@ -1,6 +1,8 @@
 import {
   ApplicationCommandOptionType,
+  AttachmentBuilder,
   CommandInteraction,
+  EmbedBuilder,
   GuildMember,
   InteractionContextType,
   User
@@ -18,28 +20,38 @@ import { and, eq } from 'drizzle-orm'
 import config from '../config.js'
 import { db } from '../db/index.js'
 import { members } from '../db/schema.js'
+import { levelBadge, levelFromXp } from '../helpers/level.js'
 
-// Shared by ?eds and /eds
-function balance(target: User | GuildMember, author: User, guildId: string) {
+// Shared by ?coins and /coins
+function profile(target: User | GuildMember, guildId: string) {
   const member = db
-    .select({ currency: members.currency })
+    .select({ xp: members.xp, currency: members.currency })
     .from(members)
     .where(and(eq(members.userId, target.id), eq(members.guildId, guildId)))
     .get()
 
-  const amount = member?.currency ?? 0
+  const { xp = 0, currency = 0 } = member ?? {}
   const { name, namePlural, emoji } = config.currency
-  const text = `${emoji} **${amount}** ${amount === 1 ? name : namePlural}`
-  return target.id === author.id
-    ? text
-    : `**${target.displayName}** has ${text}`
+  const embed = new EmbedBuilder()
+    .setColor(config.color)
+    .setAuthor({ name: target.displayName, iconURL: target.displayAvatarURL() })
+    .setDescription(
+      `${emoji} \`${currency.toLocaleString('de-CH')}\` ${currency === 1 ? name : namePlural}\n` +
+        `✦ Level \`${levelFromXp(xp).level}\``
+    )
+    .setThumbnail('attachment://level.png')
+
+  return {
+    embeds: [embed],
+    files: [new AttachmentBuilder(levelBadge(xp), { name: 'level.png' })]
+  }
 }
 
 @Discord()
-export class Eds {
+export class Coins {
   @Slash({
-    name: 'eds',
-    description: 'Count your Eddies before we do',
+    name: 'coins',
+    description: 'Count your coins before we do',
     contexts: [InteractionContextType.Guild]
   })
   async slash(
@@ -54,11 +66,11 @@ export class Eds {
   ) {
     if (!interaction.inGuild()) return
     await interaction.reply(
-      balance(user ?? interaction.user, interaction.user, interaction.guildId)
+      profile(user ?? interaction.user, interaction.guildId)
     )
   }
 
-  @SimpleCommand({ name: 'eds' })
+  @SimpleCommand({ name: 'coins' })
   async text(
     @SimpleCommandOption({ name: 'user', type: SimpleCommandOptionType.User })
     user: User | GuildMember | undefined,
@@ -66,7 +78,7 @@ export class Eds {
   ) {
     if (!message.inGuild()) return
     await message.reply({
-      content: balance(user ?? message.author, message.author, message.guildId),
+      ...profile(user ?? message.author, message.guildId),
       allowedMentions: { repliedUser: false }
     })
   }

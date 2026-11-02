@@ -3,7 +3,10 @@ import { Discord, On } from 'discordx'
 import { sql } from 'drizzle-orm'
 import { db } from '../db/index.js'
 import { members } from '../db/schema.js'
-import getLevelFromXp from '../helpers/levelConverter.js'
+import { levelFromXp } from '../helpers/level.js'
+
+// Last XP reward per guild member, XP is granted at most once a minute
+const lastXp = new Map<string, number>()
 
 @Discord()
 export class ActivityMonitor {
@@ -12,11 +15,19 @@ export class ActivityMonitor {
     if (!message.inGuild() || message.author.bot) return
 
     const contentLength = Math.min(message.content.length, 200)
-    const xp = Math.floor(contentLength / 4)
     const currency = Math.floor(
       message.member?.premiumSince ? contentLength / 7.5 : contentLength / 10
     )
-    if (xp === 0) return
+
+    // Random 15-25 XP, so every message is a small gamble
+    const key = `${message.guildId}:${message.author.id}`
+    const now = Date.now()
+    const xp =
+      now - (lastXp.get(key) ?? 0) >= 60_000
+        ? 15 + Math.floor(Math.random() * 11)
+        : 0
+    if (xp) lastXp.set(key, now)
+    else if (currency === 0) return
 
     // Single atomic upsert, no read-modify-write
     const member = db
@@ -37,9 +48,14 @@ export class ActivityMonitor {
       .returning({ xp: members.xp })
       .get()
 
-    const rank = getLevelFromXp(member.xp)
-    if (rank > getLevelFromXp(member.xp - xp)) {
-      console.log(`${message.author.username} is now rank ${rank}`)
+    const { level } = levelFromXp(member.xp)
+    if (level > levelFromXp(member.xp - xp).level) {
+      message
+        .reply({
+          content: `✦ Level \`${level}\``,
+          allowedMentions: { repliedUser: false }
+        })
+        .catch(console.error)
     }
   }
 }

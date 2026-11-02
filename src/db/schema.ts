@@ -1,6 +1,6 @@
 import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
-// One row per user per guild. Rank is derived from xp, see helpers/levelConverter.ts
+// One row per user per guild. Level is derived from xp, see helpers/level.ts
 export const members = sqliteTable(
   'members',
   {
