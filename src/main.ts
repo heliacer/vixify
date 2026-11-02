@@ -32,7 +32,7 @@ bot.once('clientReady', async () => {
 
   setInterval(
     () => bot.user?.setPresence(nextPresence()),
-    config.presenceInterval
+    20000
   )
 
   console.log('Bot started')

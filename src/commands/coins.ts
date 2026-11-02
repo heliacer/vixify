@@ -32,13 +32,15 @@ function profile(target: User | GuildMember, guildId: string) {
     .get()
 
   const { xp = 0, currency = 0 } = member ?? {}
+  const { level, xp: into, next } = levelFromXp(xp)
   const { name, namePlural, emoji } = config.currency
+  const filled = Math.floor((into / next) * 10)
   const embed = new EmbedBuilder()
     .setColor(Colors.Purple)
     .setAuthor({ name: target.displayName, iconURL: target.displayAvatarURL() })
     .setDescription(
-      `${emoji} \`${currency.toLocaleString('de-CH')}\` ${currency === 1 ? name : namePlural}\n` +
-        `✦ Level \`${levelFromXp(xp).level}\``
+      `${config.rank.label} \`${level}\` ${currency === 1 ? name : namePlural} \`${currency.toLocaleString('de-CH')} ${emoji}\`\n` +
+        `${'▰'.repeat(filled)}${'▱'.repeat(10 - filled)} \`${into}/${next}\` XP`
     )
     .setThumbnail('attachment://level.png')
 

@@ -5,8 +5,10 @@ const config = {
     namePlural: 'Coins',
     emoji: '⬡'
   },
-  // How often the custom status rotates, in ms
-  presenceInterval: 60_000,
+  rank: {
+    label: 'Level',
+    short: 'LV'
+  },
   customPresence: [
     'You are the product',
     'Innovating your obsolescence',
