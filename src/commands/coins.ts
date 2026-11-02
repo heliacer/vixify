@@ -1,6 +1,7 @@
 import {
   ApplicationCommandOptionType,
   AttachmentBuilder,
+  Colors,
   CommandInteraction,
   EmbedBuilder,
   GuildMember,
@@ -33,7 +34,7 @@ function profile(target: User | GuildMember, guildId: string) {
   const { xp = 0, currency = 0 } = member ?? {}
   const { name, namePlural, emoji } = config.currency
   const embed = new EmbedBuilder()
-    .setColor(config.color)
+    .setColor(Colors.Purple)
     .setAuthor({ name: target.displayName, iconURL: target.displayAvatarURL() })
     .setDescription(
       `${emoji} \`${currency.toLocaleString('de-CH')}\` ${currency === 1 ? name : namePlural}\n` +

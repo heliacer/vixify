@@ -50,11 +50,8 @@ export class ActivityMonitor {
 
     const { level } = levelFromXp(member.xp)
     if (level > levelFromXp(member.xp - xp).level) {
-      message
-        .reply({
-          content: `✦ Level \`${level}\``,
-          allowedMentions: { repliedUser: false }
-        })
+      message.channel
+        .send(`Congrats ${message.author}, you're now ✦ Level \`${level}\``)
         .catch(console.error)
     }
   }
