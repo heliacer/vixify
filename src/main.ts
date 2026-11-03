@@ -6,8 +6,8 @@ import './commands/coins.js'
 import './commands/steal.js'
 import './events/activity.js'
 
-// Random status line, never the same one twice in a row
 let lastPresence = -1
+
 function nextPresence(): PresenceData {
   const lines = config.customPresence
   let i = Math.floor(Math.random() * lines.length)
@@ -17,7 +17,6 @@ function nextPresence(): PresenceData {
 }
 
 const bot = new Client({
-  // Also sent on every fresh gateway identify, so a reconnect never drops the status
   presence: nextPresence(),
   intents: [
     IntentsBitField.Flags.Guilds,
@@ -28,11 +27,8 @@ const bot = new Client({
 })
 
 bot.once('clientReady', async () => {
-  // Synchronize application commands with Discord
   await bot.initApplicationCommands()
-
   setInterval(() => bot.user?.setPresence(nextPresence()), 20000)
-
   console.log('Bot started')
 })
 

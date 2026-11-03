@@ -1,7 +1,6 @@
 import { Resvg } from '@resvg/resvg-js'
 import config from '../config.js'
 
-// XP needed to climb from `level` to the next one
 const cost = (level: number) => 100 + 50 * level
 
 export function levelFromXp(xp: number) {
@@ -10,7 +9,6 @@ export function levelFromXp(xp: number) {
   return { level, xp, next: cost(level) }
 }
 
-// Hex badge for embed thumbnails, echoes the ⬡ coin. Transparent so it sits on any theme
 const color = `#${config.color.toString(16)}`
 const hex = 'M80 16L135.43 48L135.43 112L80 144L24.57 112L24.57 48Z'
 const perimeter = 6 * 64

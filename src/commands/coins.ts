@@ -23,7 +23,6 @@ import { db } from '../db/index.js'
 import { members } from '../db/schema.js'
 import { levelBadge, levelFromXp } from '../helpers/level.js'
 
-// Shared by ?coins and /coins
 function profile(target: User | GuildMember, guildId: string) {
   const member = db
     .select({ xp: members.xp, currency: members.currency })
@@ -35,6 +34,7 @@ function profile(target: User | GuildMember, guildId: string) {
   const { level, xp: into, next } = levelFromXp(xp)
   const { name, namePlural, emoji } = config.currency
   const filled = Math.floor((into / next) * 10)
+
   const embed = new EmbedBuilder()
     .setColor(Colors.Purple)
     .setAuthor({ name: target.displayName, iconURL: target.displayAvatarURL() })

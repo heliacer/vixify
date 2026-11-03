@@ -33,16 +33,14 @@ const add = (userId: string, guildId: string, amount: number) =>
     .where(and(eq(members.userId, userId), eq(members.guildId, guildId)))
     .run()
 
-// Last time each guild member got caught, they sit out a minute after
 const caughtAt = new Map<string, number>()
 
-// Shared by ?steal and /steal, only an actual steal pings the target
 function steal(thief: User, target: User | GuildMember, guildId: string) {
   const key = `${guildId}:${thief.id}`
-  // 10% of the target's coins but at least 1, and the thief stakes the same amount
   const held = balance(target.id, guildId)
   const amount = held && Math.max(1, Math.floor(held * 0.1))
   const coins = `\`${amount.toLocaleString('de-CH')} ${config.currency.emoji}\``
+
   const users: string[] = []
   let content: string
   if (Date.now() - (caughtAt.get(key) ?? 0) < 60_000)
@@ -51,7 +49,6 @@ function steal(thief: User, target: User | GuildMember, guildId: string) {
   else if (balance(thief.id, guildId) < amount)
     content = `you need ${coins} to risk stealing from ${target}`
   else {
-    // 60% the coins move to the thief, otherwise the target gets paid
     const caught = Math.random() >= 0.6
     const [from, to] = caught ? [thief.id, target.id] : [target.id, thief.id]
     db.transaction(() => {
@@ -64,6 +61,7 @@ function steal(thief: User, target: User | GuildMember, guildId: string) {
       ? `you got caught stealing 🤣💀\n${target} gets ${coins} instead`
       : `stole ${coins} from ${target}`
   }
+
   return { content, allowedMentions: { users, repliedUser: false } }
 }
 

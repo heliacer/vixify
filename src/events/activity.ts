@@ -5,7 +5,6 @@ import { db } from '../db/index.js'
 import { members } from '../db/schema.js'
 import { levelFromXp } from '../helpers/level.js'
 
-// Last XP reward per guild member, XP is granted at most once a minute
 const lastXp = new Map<string, number>()
 
 @Discord()
@@ -19,7 +18,6 @@ export class ActivityMonitor {
       message.member?.premiumSince ? contentLength / 7.5 : contentLength / 10
     )
 
-    // Random 15-25 XP, so every message is a small gamble
     const key = `${message.guildId}:${message.author.id}`
     const now = Date.now()
     const xp =
@@ -29,7 +27,6 @@ export class ActivityMonitor {
     if (xp) lastXp.set(key, now)
     else if (currency === 0) return
 
-    // Single atomic upsert, no read-modify-write
     const member = db
       .insert(members)
       .values({

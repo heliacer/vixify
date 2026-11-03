@@ -2,7 +2,6 @@
 node_modules/
 build/
 
-# sqlite database (migrations in drizzle/ are committed)
 *.db
 *.db-wal
 *.db-shm
