@@ -107,10 +107,10 @@ function leaderboard(
   const width = top ? value(top).length : 0
 
   const line = (row: Row, rank: number) => {
-    const medal = medals[rank - 1] ?? ''
+    const marker = medals[rank - 1] ?? `${rank}. `
     const amount = value(row).padStart(width, ' ')
     const you = row.userId === viewerId ? ' ◂ you' : ''
-    return `${rank}. ${medal}\`${amount}\` <@${row.userId}>${you}`
+    return `${marker}\`${amount}\` <@${row.userId}>${you}`
   }
 
   const viewerRank = rankOf(board, guildId, viewerId)
