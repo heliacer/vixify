@@ -10,3 +10,15 @@ export const members = sqliteTable(
   },
   t => [primaryKey({ columns: [t.userId, t.guildId] })]
 )
+
+export const sessions = sqliteTable('sessions', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  game: text().notNull(),
+  guildId: text().notNull(),
+  channelId: text().notNull(),
+  messageId: text().notNull(),
+  hostId: text().notNull(),
+  guestId: text(),
+  stake: integer().notNull(),
+  deadline: integer().notNull()
+})

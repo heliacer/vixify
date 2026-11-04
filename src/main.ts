@@ -3,6 +3,7 @@ import { ActivityType, IntentsBitField } from 'discord.js'
 import { Client } from 'discordx'
 import config from './config.js'
 import './commands/coins.js'
+import { closeExpired } from './commands/gamble.js'
 import './commands/leaderboard.js'
 import './commands/steal.js'
 import './events/activity.js'
@@ -30,6 +31,7 @@ const bot = new Client({
 bot.once('clientReady', async () => {
   await bot.initApplicationCommands()
   setInterval(() => bot.user?.setPresence(nextPresence()), 20000)
+  setInterval(() => closeExpired(bot).catch(console.error), 15000)
   console.log('Bot started')
 })
 

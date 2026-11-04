@@ -14,24 +14,9 @@ import {
   Slash,
   SlashOption
 } from 'discordx'
-import { and, eq, sql } from 'drizzle-orm'
 import config from '../config.js'
 import { db } from '../db/index.js'
-import { members } from '../db/schema.js'
-
-const balance = (userId: string, guildId: string) =>
-  db
-    .select({ currency: members.currency })
-    .from(members)
-    .where(and(eq(members.userId, userId), eq(members.guildId, guildId)))
-    .get()?.currency ?? 0
-
-const add = (userId: string, guildId: string, amount: number) =>
-  db
-    .update(members)
-    .set({ currency: sql`${members.currency} + ${amount}` })
-    .where(and(eq(members.userId, userId), eq(members.guildId, guildId)))
-    .run()
+import { add, balance } from '../helpers/economy.js'
 
 const caughtAt = new Map<string, number>()
 

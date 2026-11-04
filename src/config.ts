@@ -9,6 +9,7 @@ const config = {
     label: 'Level',
     short: 'LVL'
   },
+  houseCut: 5,
   customPresence: [
     'You are the product',
     'Innovating your obsolescence',
