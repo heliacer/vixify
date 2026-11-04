@@ -3,6 +3,7 @@ import { ActivityType, IntentsBitField } from 'discord.js'
 import { Client } from 'discordx'
 import config from './config.js'
 import './commands/coins.js'
+import './commands/leaderboard.js'
 import './commands/steal.js'
 import './events/activity.js'
 
