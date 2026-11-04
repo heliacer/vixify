@@ -5,7 +5,6 @@ import {
   ButtonStyle,
   CommandInteraction,
   ContainerBuilder,
-  Guild,
   InteractionContextType,
   MessageFlags,
   SeparatorBuilder,
@@ -29,6 +28,7 @@ type Board = 'coins' | 'level'
 type Row = { userId: string; xp: number; currency: number }
 
 const perPage = 10
+const medals = ['🥇 ', '🥈 ', '🥉 ']
 const { name, namePlural, emoji } = config.currency
 
 const boards = {
@@ -92,28 +92,28 @@ function rows(board: Board, guildId: string, limit: number, offset = 0): Row[] {
 function leaderboard(
   board: Board,
   requestedPage: number,
-  guild: Guild,
+  guildId: string,
   viewerId: string
 ) {
   const { title, swapLabel, value } = boards[board]
   const total =
-    db.select({ n: count() }).from(members).where(ranked(board, guild.id)).get()
+    db.select({ n: count() }).from(members).where(ranked(board, guildId)).get()
       ?.n ?? 0
   const pages = Math.max(1, Math.ceil(total / perPage))
   const page = Math.min(Math.max(1, requestedPage), pages)
-  const entries = rows(board, guild.id, perPage, (page - 1) * perPage)
+  const entries = rows(board, guildId, perPage, (page - 1) * perPage)
 
-  const [top] = rows(board, guild.id, 1)
+  const [top] = rows(board, guildId, 1)
   const width = top ? value(top).length : 0
 
   const line = (row: Row, rank: number) => {
-    const number = `*#${String(rank).padStart(2, '0')}*`
+    const medal = medals[rank - 1] ?? ''
     const amount = value(row).padStart(width, ' ')
     const you = row.userId === viewerId ? ' ◂ you' : ''
-    return `${number} \`${amount}\` <@${row.userId}>${you}`
+    return `${rank}. ${medal}\`${amount}\` <@${row.userId}>${you}`
   }
 
-  const viewerRank = rankOf(board, guild.id, viewerId)
+  const viewerRank = rankOf(board, guildId, viewerId)
   const viewerPage = viewerRank ? Math.ceil(viewerRank / perPage) : page
   const firstRank = (page - 1) * perPage + 1
 
@@ -145,33 +145,25 @@ function leaderboard(
   ]
 
   const text = (content: string) => new TextDisplayBuilder().setContent(content)
-  const divider = () => new SeparatorBuilder()
+  const list =
+    entries.map((row, i) => line(row, firstRank + i)).join('\n') ||
+    'nobody on the board yet. go make some noise'
 
   const container = new ContainerBuilder()
     .setAccentColor(config.color)
-    .addTextDisplayComponents(
-      text(`## ${title}\n-# ${guild.name} · ${total} ranked`)
-    )
-    .addSeparatorComponents(divider())
-    .addTextDisplayComponents(
-      text(
-        entries.map((row, i) => line(row, firstRank + i)).join('\n') ||
-          'nobody on the board yet. go make some noise'
-      )
-    )
+    .addTextDisplayComponents(text(`## ${title}\n${list}`))
 
   if (viewerRank && viewerPage !== page) {
-    const [viewer] = rows(board, guild.id, 1, viewerRank - 1)
+    const [viewer] = rows(board, guildId, 1, viewerRank - 1)
     container
-      .addSeparatorComponents(divider())
+      .addSeparatorComponents(new SeparatorBuilder())
       .addTextDisplayComponents(text(line(viewer, viewerRank)))
+      .addSeparatorComponents(new SeparatorBuilder())
   }
 
-  container
-    .addSeparatorComponents(divider())
-    .addActionRowComponents(
-      new ActionRowBuilder<ButtonBuilder>().addComponents(buttons)
-    )
+  container.addActionRowComponents(
+    new ActionRowBuilder<ButtonBuilder>().addComponents(buttons)
+  )
 
   return {
     components: [container],
@@ -193,17 +185,17 @@ export class Leaderboard {
     description: 'Rank everyone by what we let them keep'
   })
   async coinsSlash(interaction: CommandInteraction) {
-    if (!interaction.inCachedGuild()) return
+    if (!interaction.inGuild()) return
     await interaction.reply(
-      leaderboard('coins', 1, interaction.guild, interaction.user.id)
+      leaderboard('coins', 1, interaction.guildId, interaction.user.id)
     )
   }
 
   @Slash({ name: 'level', description: 'Rank everyone by time wasted here' })
   async levelSlash(interaction: CommandInteraction) {
-    if (!interaction.inCachedGuild()) return
+    if (!interaction.inGuild()) return
     await interaction.reply(
-      leaderboard('level', 1, interaction.guild, interaction.user.id)
+      leaderboard('level', 1, interaction.guildId, interaction.user.id)
     )
   }
 
@@ -211,7 +203,7 @@ export class Leaderboard {
   async coinsText({ message }: SimpleCommandMessage) {
     if (!message.inGuild()) return
     await message.reply(
-      leaderboard('coins', 1, message.guild, message.author.id)
+      leaderboard('coins', 1, message.guildId, message.author.id)
     )
   }
 
@@ -219,26 +211,26 @@ export class Leaderboard {
   async levelText({ message }: SimpleCommandMessage) {
     if (!message.inGuild()) return
     await message.reply(
-      leaderboard('level', 1, message.guild, message.author.id)
+      leaderboard('level', 1, message.guildId, message.author.id)
     )
   }
 
   @ButtonComponent({ id: /^lb:(coins|level):\d+:/ })
   async navigate(interaction: ButtonInteraction) {
-    if (!interaction.inCachedGuild()) return
+    if (!interaction.inGuild()) return
     const [, board, page, role] = interaction.customId.split(':') as [
       string,
       Board,
       string,
       string
     ]
-    const { guild, user } = interaction
-    const rank = role === 'me' ? rankOf(board, guild.id, user.id) : undefined
+    const { guildId, user } = interaction
+    const rank = role === 'me' ? rankOf(board, guildId, user.id) : undefined
     await interaction.update(
       leaderboard(
         board,
         rank ? Math.ceil(rank / perPage) : Number(page),
-        guild,
+        guildId,
         user.id
       )
     )
