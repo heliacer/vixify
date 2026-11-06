@@ -15,9 +15,12 @@ export const balance = (userId: string, guildId: string) =>
 
 export const add = (userId: string, guildId: string, amount: number) =>
   db
-    .update(members)
-    .set({ currency: sql`${members.currency} + ${amount}` })
-    .where(member(userId, guildId))
+    .insert(members)
+    .values({ userId, guildId, currency: amount })
+    .onConflictDoUpdate({
+      target: [members.userId, members.guildId],
+      set: { currency: sql`${members.currency} + ${amount}` }
+    })
     .run()
 
 export const take = (userId: string, guildId: string, amount: number) =>

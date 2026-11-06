@@ -5,6 +5,7 @@ import config from './config.js'
 import './commands/coins.js'
 import { closeExpired } from './commands/gamble.js'
 import './commands/leaderboard.js'
+import './commands/share.js'
 import './commands/steal.js'
 import './events/activity.js'
 
