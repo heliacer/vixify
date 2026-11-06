@@ -27,7 +27,15 @@ npm run dev
 
 `npm run db:studio` opens a browser UI for the database.
 
+### Contributing
+
+- Use your own bot and test server, never the production token. Turn on **Message Content Intent** in the Discord developer portal.
+- Run everything from the repo root, `vixify.db` and `drizzle/` are relative paths.
+- `main` is production. Open a PR, it gets rebased in.
+
 ## Raspberry Pi
+
+My production setup on a Pi reached over local SSH. You don't need it to work on the bot.
 
 ### 1. Install
 

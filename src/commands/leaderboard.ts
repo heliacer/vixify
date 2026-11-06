@@ -3,6 +3,7 @@ import {
   ButtonBuilder,
   ButtonInteraction,
   ButtonStyle,
+  Colors,
   CommandInteraction,
   ContainerBuilder,
   InteractionContextType,
@@ -150,7 +151,7 @@ function leaderboard(
     'nobody on the board yet. go make some noise'
 
   const container = new ContainerBuilder()
-    .setAccentColor(config.color)
+    .setAccentColor(Colors.Purple)
     .addTextDisplayComponents(text(`## ${title}\n${list}`))
 
   if (viewerRank && viewerPage !== page) {

@@ -1,5 +1,4 @@
 const config = {
-  color: 0xd55efa,
   currency: {
     name: 'Coin',
     namePlural: 'Coins',

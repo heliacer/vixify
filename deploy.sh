@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
+exec 9>/tmp/vixify-deploy.lock
+flock -n 9 || exit 0
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 
 git fetch --quiet origin main

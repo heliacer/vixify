@@ -18,7 +18,7 @@ import config from '../config.js'
 import { db } from '../db/index.js'
 import { add, balance } from '../helpers/economy.js'
 
-const caughtAt = new Map<string, number>()
+const lastSteal = new Map<string, number>()
 
 function steal(thief: User, target: User | GuildMember, guildId: string) {
   const key = `${guildId}:${thief.id}`
@@ -28,19 +28,20 @@ function steal(thief: User, target: User | GuildMember, guildId: string) {
 
   const users: string[] = []
   let content: string
-  if (Date.now() - (caughtAt.get(key) ?? 0) < 60_000)
-    content = 'the house saw your steal. sit the next minute out'
+  if (thief.id === target.id) content = 'robbing yourself is a premium feature'
+  else if (Date.now() - (lastSteal.get(key) ?? 0) < 60_000)
+    content = 'the house saw your last steal. sit the next minute out'
   else if (!amount) content = `${target} has nothing to steal`
   else if (balance(thief.id, guildId) < amount)
     content = `you need ${coins} to risk stealing from ${target}`
   else {
-    const caught = Math.random() >= 0.6
+    const caught = Math.random() >= 0.55
     const [from, to] = caught ? [thief.id, target.id] : [target.id, thief.id]
     db.transaction(() => {
       add(from, guildId, -amount)
       add(to, guildId, amount)
     })
-    if (caught) caughtAt.set(key, Date.now())
+    lastSteal.set(key, Date.now())
     users.push(target.id)
     content = caught
       ? `you got caught stealing 🤣💀\n${target} gets ${coins} instead`
@@ -81,7 +82,10 @@ export class Steal {
     await message.reply(
       user
         ? steal(message.author, user, message.guildId)
-        : 'usage: ?steal @user'
+        : {
+            content: 'usage: ?steal @user',
+            allowedMentions: { repliedUser: false }
+          }
     )
   }
 }

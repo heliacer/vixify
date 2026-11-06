@@ -1,18 +1,18 @@
 import type { MessageActionRowComponentBuilder } from 'discord.js'
 import {
   ActionRowBuilder,
+  Colors,
   ContainerBuilder,
   MessageFlags,
   SeparatorBuilder,
   TextDisplayBuilder
 } from 'discord.js'
-import config from '../config.js'
 
 type Part =
   string | SeparatorBuilder | ActionRowBuilder<MessageActionRowComponentBuilder>
 
 export function card(...parts: Part[]) {
-  const container = new ContainerBuilder().setAccentColor(config.color)
+  const container = new ContainerBuilder().setAccentColor(Colors.Purple)
   for (const part of parts) {
     if (typeof part === 'string')
       container.addTextDisplayComponents(

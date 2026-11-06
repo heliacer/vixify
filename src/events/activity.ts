@@ -1,11 +1,12 @@
 import type { ArgsOf } from 'discordx'
 import { Discord, On } from 'discordx'
 import { sql } from 'drizzle-orm'
+import config from '../config.js'
 import { db } from '../db/index.js'
 import { members } from '../db/schema.js'
 import { levelFromXp } from '../helpers/level.js'
 
-const lastXp = new Map<string, number>()
+const lastReward = new Map<string, number>()
 
 @Discord()
 export class ActivityMonitor {
@@ -13,19 +14,16 @@ export class ActivityMonitor {
   messageCreate([message]: ArgsOf<'messageCreate'>): void {
     if (!message.inGuild() || message.author.bot) return
 
+    const key = `${message.guildId}:${message.author.id}`
+    const now = Date.now()
+    if (now - (lastReward.get(key) ?? 0) < 30_000) return
+    lastReward.set(key, now)
+
     const contentLength = Math.min(message.content.length, 200)
     const currency = Math.floor(
       message.member?.premiumSince ? contentLength / 7.5 : contentLength / 10
     )
-
-    const key = `${message.guildId}:${message.author.id}`
-    const now = Date.now()
-    const xp =
-      now - (lastXp.get(key) ?? 0) >= 60_000
-        ? 15 + Math.floor(Math.random() * 11)
-        : 0
-    if (xp) lastXp.set(key, now)
-    else if (currency === 0) return
+    const xp = 15 + Math.floor(Math.random() * 11)
 
     const member = db
       .insert(members)
@@ -48,7 +46,9 @@ export class ActivityMonitor {
     const { level } = levelFromXp(member.xp)
     if (level > levelFromXp(member.xp - xp).level) {
       message.channel
-        .send(`Congrats ${message.author}, you're now ✦ Level \`${level}\``)
+        .send(
+          `Congrats ${message.author}, you're now ✦ ${config.rank.label} \`${level}\``
+        )
         .catch(console.error)
     }
   }
