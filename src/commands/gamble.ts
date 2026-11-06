@@ -39,10 +39,9 @@ import { games } from '../games/index.js'
 import { card } from '../helpers/card.js'
 import { balance, formatCoins, take } from '../helpers/economy.js'
 import type { Session } from '../helpers/session.js'
-import { settle } from '../helpers/session.js'
+import { sessionTime, settle } from '../helpers/session.js'
 
 const minStake = 10
-const lobbyTime = 120_000
 
 const gameLine = (game: string) =>
   `-# ${games[game].emoji} ${games[game].label.toLowerCase()}`
@@ -63,12 +62,14 @@ function menu(
     .setCustomId(`gamble:pick:${host.id}:${target?.id ?? ''}`)
     .setPlaceholder('Choose a game')
     .addOptions(
-      Object.entries(games).map(([value, { emoji, label, blurb }]) => ({
-        value,
-        emoji,
-        label,
-        description: blurb
-      }))
+      Object.entries(games)
+        .filter(([, { solo }]) => !target || !solo)
+        .map(([value, { emoji, label, blurb }]) => ({
+          value,
+          emoji,
+          label,
+          description: blurb
+        }))
     )
   const hook = target ? ` ${target} is on the hook.` : ''
   const held = formatCoins(balance(host.id, guildId))
@@ -106,10 +107,12 @@ function lobby({ id, game, hostId, guestId, stake, deadline }: Session) {
   )
 }
 
-const closed = ({ game, hostId, stake }: Session) =>
-  card(
+function close({ id, game, hostId, stake }: Session) {
+  settle(id, { [hostId]: stake })
+  return card(
     `${gameLine(game)}\n## table closed\n\`${formatCoins(stake)}\` went back to <@${hostId}>`
   )
+}
 
 const sessionOf = ({ customId }: ButtonInteraction) =>
   db
@@ -132,10 +135,10 @@ export async function closeExpired(client: Client) {
     .all()
 
   for (const session of expired) {
-    settle(session.id, { [session.hostId]: session.stake })
+    const result = games[session.game].timeout?.(session) ?? close(session)
     const channel = await client.channels.fetch(session.channelId)
     if (channel?.isTextBased())
-      await channel.messages.edit(session.messageId, closed(session))
+      await channel.messages.edit(session.messageId, result)
   }
 }
 
@@ -226,11 +229,13 @@ export class Gamble {
         hostId: user.id,
         guestId: targetId || null,
         stake,
-        deadline: Date.now() + lobbyTime
+        deadline: Date.now() + sessionTime
       })
       .returning()
       .get()
-    await interaction.update(lobby(session))
+    await interaction.update(
+      games[game].solo ? games[game].play(session, user.id) : lobby(session)
+    )
   }
 
   @ButtonComponent({ id: /^gamble:join:/ })
@@ -258,7 +263,17 @@ export class Gamble {
     if (![session.hostId, session.guestId].includes(interaction.user.id))
       return refuse(interaction, 'not your table')
 
-    settle(session.id, { [session.hostId]: session.stake })
-    await interaction.update(closed(session))
+    await interaction.update(close(session))
+  }
+
+  @ButtonComponent({ id: /^gamble:act:/ })
+  async act(interaction: ButtonInteraction) {
+    const session = sessionOf(interaction)
+    if (!session) return refuse(interaction, 'this table is gone')
+    if (interaction.user.id !== session.hostId)
+      return refuse(interaction, 'not your table')
+
+    const [, , , input] = interaction.customId.split(':')
+    await interaction.update(games[session.game].act!(session, input))
   }
 }

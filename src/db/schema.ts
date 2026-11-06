@@ -20,5 +20,6 @@ export const sessions = sqliteTable('sessions', {
   hostId: text().notNull(),
   guestId: text(),
   stake: integer().notNull(),
+  state: text({ mode: 'json' }),
   deadline: integer().notNull()
 })
