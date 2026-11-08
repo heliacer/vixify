@@ -10,14 +10,8 @@ type Board = { mines: number[]; opened: number[] }
 
 const width = 5
 const tiles = 20
-const mineCount = 5
-const houseEdge = 0.97
-
-function multiplier(safe: number) {
-  let odds = houseEdge
-  for (let i = 0; i < safe; i++) odds *= (tiles - i) / (tiles - mineCount - i)
-  return Number(odds.toFixed(2))
-}
+const mineCount = 7
+const payouts = [0, 0.25, 1, 2, 4, 10, 20, 40, 80, 160, 320, 640, 1280, 2560]
 
 function grid(id: number, { mines, opened }: Board, over = false) {
   const tile = (index: number) => {
@@ -45,29 +39,30 @@ function grid(id: number, { mines, opened }: Board, over = false) {
 
 function view({ id, stake }: Session, board: Board) {
   const safe = board.opened.length
-  const payout = Math.floor(stake * multiplier(safe))
+  const payout = Math.floor(stake * payouts[safe])
 
   return card(
     `-# 💣 mines\n## \`${formatCoins(stake)}\` on the table\n` +
-      `-# ${safe} safe - next tile pays ${multiplier(safe + 1).toFixed(2)}×`,
+      `-# ${safe} safe - next tile pays ${payouts[safe + 1]}×`,
     ...grid(id, board),
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId(`gamble:act:${id}:cash`)
         .setLabel(`Cash out - ${formatCoins(payout)}`)
         .setStyle(ButtonStyle.Primary)
+        .setDisabled(!safe)
     )
   )
 }
 
 function cashOut({ id, hostId, stake }: Session, board: Board) {
-  const rate = multiplier(board.opened.length)
+  const rate = payouts[board.opened.length]
   const payout = Math.floor(stake * rate)
   settle(id, { [hostId]: payout })
 
   return card(
     `-# 💣 mines\n## <@${hostId}> takes \`${formatCoins(payout)}\`\n` +
-      `-# cashed out at ${rate.toFixed(2)}×`,
+      `-# cashed out at ${rate}×`,
     ...grid(id, board, true)
   )
 }
