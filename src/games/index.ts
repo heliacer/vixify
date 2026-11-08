@@ -1,5 +1,6 @@
 import type { card } from '../helpers/card.js'
 import type { Session } from '../helpers/session.js'
+import { blackjack } from './blackjack.js'
 import { coinflip } from './coinflip.js'
 import { mines } from './mines.js'
 
@@ -15,4 +16,4 @@ export type Game = {
   timeout?(session: Session): View
 }
 
-export const games: Record<string, Game> = { mines, coinflip }
+export const games: Record<string, Game> = { blackjack, mines, coinflip }
