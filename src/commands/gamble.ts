@@ -1,11 +1,11 @@
-import type { Client } from 'discord.js'
+import type { Client, RepliableInteraction } from 'discord.js'
 import {
   ActionRowBuilder,
   ApplicationCommandOptionType,
   ButtonBuilder,
   ButtonInteraction,
   ButtonStyle,
-  CommandInteraction,
+  ChatInputCommandInteraction,
   GuildMember,
   InteractionContextType,
   LabelBuilder,
@@ -36,12 +36,28 @@ import config from '../config.js'
 import { db } from '../db/index.js'
 import { sessions } from '../db/schema.js'
 import { games } from '../games/index.js'
-import { card } from '../helpers/card.js'
+import { card, editMessage } from '../helpers/card.js'
 import { balance, formatCoins, take } from '../helpers/economy.js'
 import type { Session } from '../helpers/session.js'
 import { sessionTime, settle } from '../helpers/session.js'
 
 const minStake = 10
+const guildOnly = [InteractionContextType.Guild]
+const [firstGame, ...otherGames] = Object.keys(games)
+
+const userOption = {
+  name: 'user',
+  description: 'Who to call out',
+  required: false,
+  type: ApplicationCommandOptionType.User
+} as const
+
+const stakeOption = {
+  name: 'stake',
+  description: 'A number, half or all',
+  required: false,
+  type: ApplicationCommandOptionType.String
+} as const
 
 const gameLine = (game: string) =>
   `-# ${games[game].emoji} ${games[game].label.toLowerCase()}`
@@ -54,16 +70,20 @@ function parseStake(input: string, held: number) {
 }
 
 function menu(
-  host: User,
-  target: User | GuildMember | undefined,
-  guildId: string
+  hostId: string,
+  targetId: string | undefined,
+  guildId: string,
+  only?: string
 ) {
   const select = new StringSelectMenuBuilder()
-    .setCustomId(`gamble:pick:${host.id}:${target?.id ?? ''}`)
+    .setCustomId(`gamble:pick:${hostId}:${targetId ?? ''}`)
     .setPlaceholder('Choose a game')
     .addOptions(
       Object.entries(games)
-        .filter(([, { solo }]) => !target || !solo)
+        .filter(
+          ([value, { solo }]) =>
+            (!only || value === only) && !(targetId && solo)
+        )
         .map(([value, { emoji, label, blurb }]) => ({
           value,
           emoji,
@@ -71,40 +91,63 @@ function menu(
           description: blurb
         }))
     )
-  const hook = target ? ` ${target} is on the hook.` : ''
-  const held = formatCoins(balance(host.id, guildId))
+  const hook = targetId ? ` <@${targetId}> is on the hook.` : ''
+  const held = formatCoins(balance(hostId, guildId))
 
   return {
     ...card(
-      `## 🎲 gamble session\npick your poison, ${host}.${hook} you're holding \`${held}\``,
+      `## 🎲 gamble session\npick your poison, <@${hostId}>.${hook} you're holding \`${held}\``,
       new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select),
       `-# the house keeps ${config.houseCut}% of every pot`
     ),
-    allowedMentions: { users: target ? [target.id] : [], repliedUser: false }
+    allowedMentions: { users: targetId ? [targetId] : [], repliedUser: false }
   }
 }
+
+const stakeModal = (game: string, targetId: string, held: number) =>
+  new ModalBuilder()
+    .setCustomId(`gamble:stake:${game}:${targetId}`)
+    .setTitle(`${games[game].label} - how much?`)
+    .addLabelComponents(
+      new LabelBuilder()
+        .setLabel('Stake')
+        .setDescription(`you're holding ${formatCoins(held)}`)
+        .setTextInputComponent(
+          new TextInputBuilder()
+            .setCustomId('stake')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('half')
+        )
+    )
 
 function lobby({ id, game, hostId, guestId, stake, deadline }: Session) {
   const invite = guestId
     ? `<@${hostId}> called out <@${guestId}>.`
     : `<@${hostId}> wants a game.`
 
-  return card(
-    `${gameLine(game)}\n## \`${formatCoins(stake)}\` on the table\n` +
-      `${invite} match the stake to sit down.\n` +
-      `-# closes <t:${Math.floor(deadline / 1000)}:R>`,
-    new SeparatorBuilder(),
-    new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`gamble:join:${id}`)
-        .setLabel(`${guestId ? 'Accept' : 'Join'} - ${formatCoins(stake)}`)
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId(`gamble:cancel:${id}`)
-        .setLabel(guestId ? 'Decline' : 'Cancel')
-        .setStyle(ButtonStyle.Secondary)
-    )
-  )
+  return {
+    ...card(
+      `${gameLine(game)}\n## \`${formatCoins(stake)}\` on the table\n` +
+        `${invite} match the stake to sit down.\n` +
+        `-# closes <t:${Math.floor(deadline / 1000)}:R>`,
+      new SeparatorBuilder(),
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`gamble:join:${id}`)
+          .setLabel(`${guestId ? 'Accept' : 'Join'} - ${formatCoins(stake)}`)
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId(`gamble:cancel:${id}`)
+          .setLabel(guestId ? 'Decline' : 'Cancel')
+          .setStyle(ButtonStyle.Secondary)
+      )
+    ),
+    allowedMentions: {
+      parse: [],
+      users: guestId ? [guestId] : [],
+      repliedUser: false
+    }
+  }
 }
 
 function close({ id, game, hostId, stake }: Session) {
@@ -114,6 +157,45 @@ function close({ id, game, hostId, stake }: Session) {
   )
 }
 
+function begin(
+  game: string,
+  hostId: string,
+  targetId: string | undefined,
+  guildId: string,
+  channelId: string,
+  messageId: string,
+  input: string
+) {
+  const held = balance(hostId, guildId)
+  const stake = parseStake(input, held)
+  if (!Number.isInteger(stake) || stake < minStake)
+    return `the house doesn't get up for less than \`${formatCoins(minStake)}\``
+  if (!take(hostId, guildId, stake))
+    return `you're holding \`${formatCoins(held)}\``
+
+  const session = db
+    .insert(sessions)
+    .values({
+      game,
+      guildId,
+      channelId,
+      messageId,
+      hostId,
+      guestId: targetId || null,
+      stake,
+      deadline: Date.now() + sessionTime
+    })
+    .returning()
+    .get()
+  const view = games[game].solo
+    ? games[game].play(session, hostId)
+    : lobby(session)
+  return { session, view }
+}
+
+const placed = (id: number, messageId: string) =>
+  db.update(sessions).set({ messageId }).where(eq(sessions.id, id)).run()
+
 const sessionOf = ({ customId }: ButtonInteraction) =>
   db
     .select()
@@ -121,11 +203,42 @@ const sessionOf = ({ customId }: ButtonInteraction) =>
     .where(eq(sessions.id, Number(customId.split(':')[2])))
     .get()
 
-const refuse = (
-  interaction:
-    ButtonInteraction | ModalSubmitInteraction | StringSelectMenuInteraction,
-  content: string
-) => interaction.reply({ content, flags: MessageFlags.Ephemeral })
+const refuse = (interaction: RepliableInteraction, content: string) =>
+  interaction.reply({ content, flags: MessageFlags.Ephemeral })
+
+async function start(
+  game: string,
+  interaction: ChatInputCommandInteraction | ModalSubmitInteraction,
+  targetId: string | undefined,
+  input: string
+) {
+  if (!interaction.inGuild()) return
+  const { user, guildId, channelId } = interaction
+  const started = begin(game, user.id, targetId, guildId, channelId!, '', input)
+  if (typeof started === 'string') return refuse(interaction, started)
+  const { resource } = await interaction.reply({
+    ...started.view,
+    withResponse: true
+  })
+  placed(started.session.id, resource!.message!.id)
+}
+
+function quick(
+  game: string,
+  interaction: ChatInputCommandInteraction,
+  targetId: string | undefined,
+  input: string | undefined
+) {
+  if (!interaction.inGuild()) return
+  if (input) return start(game, interaction, targetId, input)
+  return interaction.showModal(
+    stakeModal(
+      game,
+      targetId ?? '',
+      balance(interaction.user.id, interaction.guildId)
+    )
+  )
+}
 
 export async function closeExpired(client: Client) {
   const expired = db
@@ -135,32 +248,24 @@ export async function closeExpired(client: Client) {
     .all()
 
   for (const session of expired) {
-    const result = games[session.game].timeout?.(session) ?? close(session)
-    const channel = await client.channels.fetch(session.channelId)
-    if (channel?.isTextBased())
-      await channel.messages.edit(session.messageId, result)
+    const { timeout } = games[session.game]
+    const result =
+      session.state && timeout ? timeout(session, client) : close(session)
+    await editMessage(client, session.channelId, session.messageId, result)
   }
 }
 
 @Discord()
 export class Gamble {
-  @Slash({
-    name: 'gamble',
-    description: 'Feed the house',
-    contexts: [InteractionContextType.Guild]
-  })
+  @Slash({ name: 'gamble', description: 'Feed the house', contexts: guildOnly })
   async slash(
-    @SlashOption({
-      name: 'user',
-      description: 'Who to call out',
-      required: false,
-      type: ApplicationCommandOptionType.User
-    })
-    user: User | GuildMember | undefined,
-    interaction: CommandInteraction
+    @SlashOption(userOption) user: User | GuildMember | undefined,
+    interaction: ChatInputCommandInteraction
   ) {
     if (!interaction.inGuild()) return
-    await interaction.reply(menu(interaction.user, user, interaction.guildId))
+    await interaction.reply(
+      menu(interaction.user.id, user?.id, interaction.guildId)
+    )
   }
 
   @SimpleCommand({ name: 'gamble' })
@@ -170,7 +275,87 @@ export class Gamble {
     { message }: SimpleCommandMessage
   ) {
     if (!message.inGuild()) return
-    await message.reply(menu(message.author, user, message.guildId))
+    await message.reply(menu(message.author.id, user?.id, message.guildId))
+  }
+
+  @SimpleCommand({ name: firstGame, aliases: otherGames })
+  async shortcut({ message, prefix, argString }: SimpleCommandMessage) {
+    if (!message.inGuild()) return
+    const { author, guildId, channelId } = message
+    const game = message.content.slice(prefix.length).trim().split(/\s+/)[0]
+    const key = game.toLowerCase()
+    const targetId = games[key].solo
+      ? undefined
+      : /<@!?(\d+)>/.exec(argString)?.[1]
+    const input = argString.replace(/<@!?\d+>/g, '').trim()
+
+    if (!input) return message.reply(menu(author.id, targetId, guildId, key))
+    const started = begin(
+      key,
+      author.id,
+      targetId,
+      guildId,
+      channelId,
+      '',
+      input
+    )
+    if (typeof started === 'string')
+      return message.reply({
+        content: started,
+        allowedMentions: { repliedUser: false }
+      })
+    const reply = await message.reply(started.view)
+    placed(started.session.id, reply.id)
+  }
+
+  @Slash({
+    name: 'chess',
+    description: 'Bet on your brain, if you have one',
+    contexts: guildOnly
+  })
+  chess(
+    @SlashOption(userOption) user: User | GuildMember | undefined,
+    @SlashOption(stakeOption) stake: string | undefined,
+    interaction: ChatInputCommandInteraction
+  ) {
+    return quick('chess', interaction, user?.id, stake)
+  }
+
+  @Slash({
+    name: 'blackjack',
+    description: 'Get closer to 21 than the house. good luck',
+    contexts: guildOnly
+  })
+  blackjack(
+    @SlashOption(stakeOption) stake: string | undefined,
+    interaction: ChatInputCommandInteraction
+  ) {
+    return quick('blackjack', interaction, undefined, stake)
+  }
+
+  @Slash({
+    name: 'mines',
+    description: 'Dig for gems, try not to explode',
+    contexts: guildOnly
+  })
+  mines(
+    @SlashOption(stakeOption) stake: string | undefined,
+    interaction: ChatInputCommandInteraction
+  ) {
+    return quick('mines', interaction, undefined, stake)
+  }
+
+  @Slash({
+    name: 'coinflip',
+    description: 'Double or nothing, settled by a coin',
+    contexts: guildOnly
+  })
+  coinflip(
+    @SlashOption(userOption) user: User | GuildMember | undefined,
+    @SlashOption(stakeOption) stake: string | undefined,
+    interaction: ChatInputCommandInteraction
+  ) {
+    return quick('coinflip', interaction, user?.id, stake)
   }
 
   @SelectMenuComponent({ id: /^gamble:pick:/ })
@@ -181,61 +366,31 @@ export class Gamble {
       return refuse(interaction, 'not your table. open your own with ?gamble')
 
     const [game] = interaction.values
-    const held = formatCoins(balance(hostId, interaction.guildId))
     await interaction.showModal(
-      new ModalBuilder()
-        .setCustomId(`gamble:stake:${game}:${targetId}`)
-        .setTitle(`${games[game].label} - how much?`)
-        .addLabelComponents(
-          new LabelBuilder()
-            .setLabel('Stake')
-            .setDescription(`you're holding ${held}`)
-            .setTextInputComponent(
-              new TextInputBuilder()
-                .setCustomId('stake')
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder('half')
-            )
-        )
+      stakeModal(game, targetId, balance(hostId, interaction.guildId))
     )
   }
 
   @ModalComponent({ id: /^gamble:stake:/ })
   async stake(interaction: ModalSubmitInteraction) {
-    if (!interaction.inGuild() || !interaction.isFromMessage()) return
+    if (!interaction.inGuild()) return
     const [, , game, targetId] = interaction.customId.split(':')
-    const { guildId, message, user } = interaction
-    const held = balance(user.id, guildId)
-    const stake = parseStake(
-      interaction.fields.getTextInputValue('stake'),
-      held
-    )
+    const input = interaction.fields.getTextInputValue('stake')
+    if (!interaction.isFromMessage())
+      return start(game, interaction, targetId || undefined, input)
 
-    if (!Number.isInteger(stake) || stake < minStake)
-      return refuse(
-        interaction,
-        `the house doesn't get up for less than \`${formatCoins(minStake)}\``
-      )
-    if (!take(user.id, guildId, stake))
-      return refuse(interaction, `you're holding \`${formatCoins(held)}\``)
-
-    const session = db
-      .insert(sessions)
-      .values({
-        game,
-        guildId,
-        channelId: message.channelId,
-        messageId: message.id,
-        hostId: user.id,
-        guestId: targetId || null,
-        stake,
-        deadline: Date.now() + sessionTime
-      })
-      .returning()
-      .get()
-    await interaction.update(
-      games[game].solo ? games[game].play(session, user.id) : lobby(session)
+    const { user, guildId, message } = interaction
+    const started = begin(
+      game,
+      user.id,
+      targetId,
+      guildId,
+      message.channelId,
+      message.id,
+      input
     )
+    if (typeof started === 'string') return refuse(interaction, started)
+    await interaction.update(started.view)
   }
 
   @ButtonComponent({ id: /^gamble:join:/ })
@@ -253,7 +408,13 @@ export class Gamble {
         `you need \`${formatCoins(session.stake)}\` to sit down`
       )
 
-    await interaction.update(games[session.game].play(session, user.id))
+    db.update(sessions)
+      .set({ guestId: user.id })
+      .where(eq(sessions.id, session.id))
+      .run()
+    await interaction.update(
+      games[session.game].play(session, user.id, interaction.message)
+    )
   }
 
   @ButtonComponent({ id: /^gamble:cancel:/ })
@@ -270,10 +431,13 @@ export class Gamble {
   async act(interaction: ButtonInteraction) {
     const session = sessionOf(interaction)
     if (!session) return refuse(interaction, 'this table is gone')
-    if (interaction.user.id !== session.hostId)
+    const { user, client, customId } = interaction
+    if (![session.hostId, session.guestId].includes(user.id))
       return refuse(interaction, 'not your table')
 
-    const [, , , input] = interaction.customId.split(':')
-    await interaction.update(games[session.game].act!(session, input))
+    const [, , , input] = customId.split(':')
+    await interaction.update(
+      games[session.game].act!(session, input, user.id, client)
+    )
   }
 }

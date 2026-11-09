@@ -81,3 +81,7 @@ Host pi
 ```
 
 `npm run deploy` after pushing.
+
+## Credits
+
+Chess pieces by Colin M.L. Burnett (Cburnett), used under the BSD license.

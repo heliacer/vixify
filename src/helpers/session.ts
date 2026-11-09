@@ -7,12 +7,12 @@ export type Session = typeof sessions.$inferSelect
 
 export const sessionTime = 120_000
 
-export const save = (id: number, state: unknown) =>
-  db
-    .update(sessions)
-    .set({ state, deadline: Date.now() + sessionTime })
-    .where(eq(sessions.id, id))
-    .run()
+export const save = (
+  id: number,
+  state: unknown,
+  deadline = Date.now() + sessionTime
+) =>
+  db.update(sessions).set({ state, deadline }).where(eq(sessions.id, id)).run()
 
 export const settle = (id: number, pay: Record<string, number>) =>
   db.transaction(() => {

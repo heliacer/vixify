@@ -17,6 +17,8 @@ export const sessions = sqliteTable('sessions', {
   guildId: text().notNull(),
   channelId: text().notNull(),
   messageId: text().notNull(),
+  threadId: text(),
+  boardId: text(),
   hostId: text().notNull(),
   guestId: text(),
   stake: integer().notNull(),

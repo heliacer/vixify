@@ -22,6 +22,13 @@
       "when": 1793992874854,
       "tag": "0002_omniscient_stone_men",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1794241618930,
+      "tag": "0003_military_tyger_tiger",
+      "breakpoints": true
     }
   ]
 }

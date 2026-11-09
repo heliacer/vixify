@@ -1,6 +1,8 @@
+import type { Client, Message } from 'discord.js'
 import type { card } from '../helpers/card.js'
 import type { Session } from '../helpers/session.js'
 import { blackjack } from './blackjack.js'
+import { chess } from './chess.js'
 import { coinflip } from './coinflip.js'
 import { mines } from './mines.js'
 
@@ -11,9 +13,9 @@ export type Game = {
   label: string
   blurb: string
   solo?: boolean
-  play(session: Session, guestId: string): View
-  act?(session: Session, input: string): View
-  timeout?(session: Session): View
+  play(session: Session, guestId: string, message?: Message): View
+  act?(session: Session, input: string, userId: string, client: Client): View
+  timeout?(session: Session, client: Client): View
 }
 
-export const games: Record<string, Game> = { blackjack, mines, coinflip }
+export const games: Record<string, Game> = { chess, blackjack, mines, coinflip }
