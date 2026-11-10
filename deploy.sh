@@ -7,10 +7,12 @@ flock -n 9 || exit 0
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 
 git fetch --quiet origin main
-[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] && exit 0
+target=$(git rev-parse origin/main)
+[ "$(cat build/.deployed 2>/dev/null)" = "$target" ] && exit 0
 
-git reset --hard --quiet origin/main
+git reset --hard --quiet "$target"
 npm ci
 npm run build
+echo "$target" > build/.deployed
 systemctl --user restart vixify
 echo "$(date -Is) deployed $(git rev-parse --short HEAD)"
