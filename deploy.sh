@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+trap 'echo "failed: $BASH_COMMAND"' ERR
 cd "$(dirname "$0")"
 exec 9>/tmp/vixify-deploy.lock
 flock -n 9 || exit 0
