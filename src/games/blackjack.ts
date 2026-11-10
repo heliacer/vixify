@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto'
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js'
-import { card } from '../helpers/card.js'
+import { button, card } from '../helpers/card.js'
 import { balance, formatCoins, take } from '../helpers/economy.js'
 import type { Session } from '../helpers/session.js'
 import { save, settle } from '../helpers/session.js'
@@ -42,19 +42,13 @@ function view(
   { id, hostId, guildId, stake }: Session,
   { player, house }: Hand
 ) {
-  const button = (input: string, label: string, style: ButtonStyle) =>
-    new ButtonBuilder()
-      .setCustomId(`gamble:act:${id}:${input}`)
-      .setLabel(label)
-      .setStyle(style)
-
   return card(
     `-# 🃏 blackjack\n## \`${formatCoins(stake)}\` on the table\n` +
       `house \`${house[0]}\` \`??\`\nyou ${show(player)}`,
     new ActionRowBuilder<ButtonBuilder>().addComponents(
-      button('hit', 'Hit', ButtonStyle.Primary),
-      button('stand', 'Stand', ButtonStyle.Secondary),
-      button('double', 'Double', ButtonStyle.Success).setDisabled(
+      button(`act:${id}:hit`, 'Hit', ButtonStyle.Primary),
+      button(`act:${id}:stand`, 'Stand'),
+      button(`act:${id}:double`, 'Double', ButtonStyle.Success).setDisabled(
         player.length > 2 || balance(hostId, guildId) < stake
       )
     )

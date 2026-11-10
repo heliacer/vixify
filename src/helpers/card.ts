@@ -5,6 +5,8 @@ import type {
 } from 'discord.js'
 import {
   ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   Colors,
   ContainerBuilder,
   MediaGalleryBuilder,
@@ -40,12 +42,28 @@ export function card(...parts: Part[]) {
   }
 }
 
+export const ping = <View extends ReturnType<typeof card>>(
+  view: View,
+  userId?: string | null
+) => ({
+  ...view,
+  allowedMentions: { ...view.allowedMentions, users: userId ? [userId] : [] }
+})
+
+export const button = (
+  id: string,
+  label: string,
+  style = ButtonStyle.Secondary
+) =>
+  new ButtonBuilder().setCustomId(`game:${id}`).setLabel(label).setStyle(style)
+
 export async function editMessage(
   client: Client,
   channelId: string,
   messageId: string,
   view: MessageEditOptions
 ) {
-  const channel = await client.channels.fetch(channelId)
-  if (channel?.isTextBased()) await channel.messages.edit(messageId, view)
+  const channel = await client.channels.fetch(channelId).catch(console.error)
+  if (channel?.isTextBased())
+    await channel.messages.edit(messageId, view).catch(console.error)
 }

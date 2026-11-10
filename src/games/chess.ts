@@ -12,14 +12,13 @@ import {
 import type { ArgsOf } from 'discordx'
 import { Discord, On } from 'discordx'
 import { eq } from 'drizzle-orm'
-import config from '../config.js'
 import { db } from '../db/index.js'
 import { sessions } from '../db/schema.js'
 import { boardPng } from '../helpers/board.js'
-import { card, editMessage } from '../helpers/card.js'
+import { button, card, editMessage, ping } from '../helpers/card.js'
 import { formatCoins } from '../helpers/economy.js'
 import type { Session } from '../helpers/session.js'
-import { save, settle } from '../helpers/session.js'
+import { save, verdict } from '../helpers/session.js'
 import type { Game } from './index.js'
 
 type Match = {
@@ -65,14 +64,16 @@ const toMove = (game: Chess, { white, black }: Match) =>
 const opponent = ({ white, black }: Match, userId: string) =>
   userId === white ? black : white
 
-const drawReason = (game: Chess) =>
-  game.isStalemate()
-    ? 'stalemate'
-    : game.isInsufficientMaterial()
-      ? 'not enough pieces left to mate'
-      : game.isThreefoldRepetition()
-        ? 'same position three times'
-        : '50 moves without a capture or pawn move'
+const ending = (game: Chess) =>
+  game.isCheckmate()
+    ? 'checkmate'
+    : game.isStalemate()
+      ? 'stalemate'
+      : game.isInsufficientMaterial()
+        ? 'not enough pieces left to mate'
+        : game.isThreefoldRepetition()
+          ? 'same position three times'
+          : '50 moves without a capture or pawn move'
 
 function withBoard(
   game: Chess,
@@ -99,14 +100,9 @@ function live(id: number, match: Match, game: Chess, deadline: number) {
   const offer = match.drawOffer
     ? `\n-# <@${match.drawOffer}> offers a draw`
     : ''
-  const button = (input: string, label: string, style: ButtonStyle) =>
-    new ButtonBuilder()
-      .setCustomId(`gamble:act:${id}:${input}`)
-      .setLabel(label)
-      .setStyle(style)
 
-  return {
-    ...withBoard(
+  return ping(
+    withBoard(
       game,
       game.turn() === 'b',
       `**${game.turn() === 'w' ? '⚪' : '⚫'} <@${mover}> to move** ` +
@@ -115,37 +111,23 @@ function live(id: number, match: Match, game: Chess, deadline: number) {
       new SeparatorBuilder(),
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         button(
-          'draw',
-          match.drawOffer ? '🤝 Accept draw' : '🤝 Offer draw',
-          ButtonStyle.Secondary
+          `act:${id}:draw`,
+          match.drawOffer ? '🤝 Accept draw' : '🤝 Offer draw'
         ),
-        button('resign', '🏳️ Resign', ButtonStyle.Danger)
+        button(`act:${id}:resign`, '🏳️ Resign', ButtonStyle.Danger)
       )
     ),
-    allowedMentions: { parse: [], users: [mover], repliedUser: false }
-  }
+    mover
+  )
 }
 
 function finish(
-  { id, stake }: Session,
-  match: Match,
+  session: Session,
   game: Chess,
   reason: string,
   winner?: string
 ) {
-  const pot = stake * 2
-  const cut = Math.floor((pot * config.houseCut) / 100)
-  settle(
-    id,
-    winner
-      ? { [winner]: pot - cut }
-      : { [match.white]: stake, [match.black]: stake }
-  )
-
-  const text = winner
-    ? `## <@${winner}> takes \`${formatCoins(pot - cut)}\`\n${reason}\n` +
-      `-# the house kept ${formatCoins(cut)}`
-    : `## draw\n${reason}. \`${formatCoins(stake)}\` went back to each`
+  const text = verdict(session, reason, winner)
   return () => withBoard(game, false, `-# ♟️ chess\n${text}`)
 }
 
@@ -161,13 +143,9 @@ async function open(
   const thread = await message.startThread({
     name: `${white.displayName} vs ${black.displayName}`
   })
-  db.update(sessions)
-    .set({ threadId: thread.id })
-    .where(eq(sessions.id, id))
-    .run()
   const board = await thread.send(live(id, match, new Chess(), deadline))
   db.update(sessions)
-    .set({ boardId: board.id })
+    .set({ threadId: thread.id, boardId: board.id })
     .where(eq(sessions.id, id))
     .run()
 }
@@ -175,38 +153,31 @@ async function open(
 export const chess: Game = {
   emoji: '♟️',
   label: 'Chess',
-  blurb: '1v1 - winner takes the pot',
-  play(session, guestId, message) {
+  blurb: '1v1 - moves typed in a thread',
+  friendly: true,
+  play(session, message) {
     const { hostId, stake } = session
+    const guestId = session.guestId!
     const [white, black] = randomInt(2) ? [hostId, guestId] : [guestId, hostId]
     const match = { moves: [], white, black }
     const deadline = Date.now() + moveTime
     save(session.id, match, deadline)
     open(session, match, message!, deadline).catch(console.error)
 
-    return card(
-      `-# ♟️ chess\n## \`${formatCoins(stake * 2)}\` pot\n` +
-        `⚪ <@${white}> vs ⚫ <@${black}>`
-    )
+    const title = stake ? `\`${formatCoins(stake * 2)}\` pot` : 'friendly game'
+    return card(`-# ♟️ chess\n## ${title}\n⚪ <@${white}> vs ⚫ <@${black}>`)
   },
   act(session, input, userId, client) {
     const match = session.state as Match
     const game = replay(match.moves)
 
     if (input === 'resign' || (match.drawOffer && match.drawOffer !== userId)) {
-      const final =
+      const [reason, winner] =
         input === 'resign'
-          ? finish(
-              session,
-              match,
-              game,
-              `<@${userId}> resigned`,
-              opponent(match, userId)
-            )
-          : finish(session, match, game, 'agreed to a draw')
-      editMessage(client, session.channelId, session.messageId, final()).catch(
-        console.error
-      )
+          ? [`<@${userId}> resigned`, opponent(match, userId)]
+          : ['agreed to a draw']
+      const final = finish(session, game, reason, winner)
+      editMessage(client, session.channelId, session.messageId, final())
       return final()
     }
 
@@ -218,20 +189,13 @@ export const chess: Game = {
     const match = session.state as Match
     const game = replay(match.moves)
     const late = toMove(game, match)
-    const final =
+    const [reason, winner] =
       game.history().length < 2
-        ? finish(session, match, game, `<@${late}> never made a move`)
-        : finish(
-            session,
-            match,
-            game,
-            `<@${late}> ran out of time`,
-            opponent(match, late)
-          )
+        ? [`<@${late}> never made a move`]
+        : [`<@${late}> ran out of time`, opponent(match, late)]
+    const final = finish(session, game, reason, winner)
     if (session.threadId && session.boardId)
-      editMessage(client, session.threadId, session.boardId, final()).catch(
-        console.error
-      )
+      editMessage(client, session.threadId, session.boardId, final())
     return final()
   }
 }
@@ -260,23 +224,18 @@ export class ChessMoves {
     }
 
     game.move(move.san)
-    let view
-    if (game.isGameOver()) {
-      const final = game.isCheckmate()
-        ? finish(session, match, game, 'checkmate', author.id)
-        : finish(session, match, game, drawReason(game))
-      editMessage(client, session.channelId, session.messageId, final()).catch(
-        console.error
-      )
-      view = final()
-    } else {
-      const next = { ...match, moves: game.history(), drawOffer: undefined }
-      const deadline = Date.now() + moveTime
-      save(session.id, next, deadline)
-      view = live(session.id, next, game, deadline)
-    }
+    const next = { ...match, moves: game.history(), drawOffer: undefined }
+    const deadline = Date.now() + moveTime
+    save(session.id, next, deadline)
+    const winner = game.isCheckmate() ? author.id : undefined
+    const final =
+      game.isGameOver() && finish(session, game, ending(game), winner)
+    if (final)
+      editMessage(client, session.channelId, session.messageId, final())
 
-    const board = await channel.send(view)
+    const board = await channel.send(
+      final ? final() : live(session.id, next, game, deadline)
+    )
     if (session.boardId)
       await channel.messages.delete(session.boardId).catch(console.error)
     db.update(sessions)

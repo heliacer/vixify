@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto'
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js'
-import { card } from '../helpers/card.js'
+import { button, card } from '../helpers/card.js'
 import { formatCoins } from '../helpers/economy.js'
 import type { Session } from '../helpers/session.js'
 import { save, settle } from '../helpers/session.js'
@@ -17,17 +17,15 @@ function grid(id: number, { mines, opened }: Board, over = false) {
   const tile = (index: number) => {
     const mine = over && mines.includes(index)
     const safe = opened.includes(index)
-    return new ButtonBuilder()
-      .setCustomId(`gamble:act:${id}:${index}`)
-      .setLabel(mine ? '💣' : safe ? '💎' : '?')
-      .setStyle(
-        mine
-          ? ButtonStyle.Danger
-          : safe
-            ? ButtonStyle.Success
-            : ButtonStyle.Secondary
-      )
-      .setDisabled(over || safe)
+    return button(
+      `act:${id}:${index}`,
+      mine ? '💣' : safe ? '💎' : '?',
+      mine
+        ? ButtonStyle.Danger
+        : safe
+          ? ButtonStyle.Success
+          : ButtonStyle.Secondary
+    ).setDisabled(over || safe)
   }
 
   return Array.from({ length: tiles / width }, (_, row) =>
@@ -46,11 +44,11 @@ function view({ id, stake }: Session, board: Board) {
       `-# ${safe} safe - next tile pays ${payouts[safe + 1]}×`,
     ...grid(id, board),
     new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`gamble:act:${id}:cash`)
-        .setLabel(`Cash out - ${formatCoins(payout)}`)
-        .setStyle(ButtonStyle.Primary)
-        .setDisabled(!safe)
+      button(
+        `act:${id}:cash`,
+        `Cash out - ${formatCoins(payout)}`,
+        ButtonStyle.Primary
+      ).setDisabled(!safe)
     )
   )
 }

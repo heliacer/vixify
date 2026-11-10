@@ -13,7 +13,8 @@ export type Game = {
   label: string
   blurb: string
   solo?: boolean
-  play(session: Session, guestId: string, message?: Message): View
+  friendly?: boolean
+  play(session: Session, message?: Message): View
   act?(session: Session, input: string, userId: string, client: Client): View
   timeout?(session: Session, client: Client): View
 }
