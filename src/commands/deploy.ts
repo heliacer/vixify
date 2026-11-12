@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { promisify } from 'node:util'
-import type { Client } from 'discord.js'
+import { Team, type Client } from 'discord.js'
 import { Discord, SimpleCommand, SimpleCommandMessage } from 'discordx'
 
 const run = promisify(execFile)
@@ -38,7 +38,8 @@ export class Deploy {
     if (!onPi) return
     const allowedMentions = { repliedUser: false }
     const { owner } = await message.client.application.fetch()
-    if (message.author.id !== owner?.id) {
+    const boss = owner instanceof Team ? owner.ownerId : owner?.id
+    if (message.author.id !== boss) {
       await message.reply({ content: "you don't work here", allowedMentions })
       return
     }
